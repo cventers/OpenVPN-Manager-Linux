@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "vpn-manager"
+version = "0.1.0"
+description = "Advanced VPN connection manager for Exceleron networks"
+authors = ["Chase Venters <me@chaseventers.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+pyyaml = "^6.0.2"
+click = "^8.2.1"
+fuzzywuzzy = "^0.18.0"
+python-levenshtein = "^0.27.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
