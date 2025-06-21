@@ -161,14 +161,20 @@ class VPNManager:
                     capture_output=True,
                     text=True
                 )
-                return session_name in result.stdout
+                # Use word boundary matching to avoid substring matches
+                import re
+                pattern = rf'\b{re.escape(session_name)}\b'
+                return bool(re.search(pattern, result.stdout))
             elif session_type == 'tmux':
                 result = subprocess.run(
                     ['tmux', 'list-sessions'],
                     capture_output=True,
                     text=True
                 )
-                return session_name in result.stdout
+                # Use word boundary matching to avoid substring matches
+                import re
+                pattern = rf'\b{re.escape(session_name)}\b'
+                return bool(re.search(pattern, result.stdout))
         except Exception:
             return False
         return False
@@ -445,6 +451,53 @@ class VPNManager:
                 click.echo(f"  {network} - {net_config['description']}{aliases_str}")
         
         return True
+    
+    def attach(self, profile_input: str = None) -> bool:
+        """Attach to VPN session with screen -rd"""
+        if not profile_input:
+            # Show active sessions and let user choose
+            active_sessions = []
+            for location, loc_config in self.config['profiles'].items():
+                for network in loc_config['networks'].keys():
+                    session_name = self._get_session_name(location, network)
+                    if self._check_session_exists(session_name):
+                        active_sessions.append((location, network, session_name))
+            
+            if not active_sessions:
+                click.echo("No active VPN connections to attach to")
+                return False
+            
+            if len(active_sessions) == 1:
+                # Only one session, attach to it
+                location, network, session_name = active_sessions[0]
+                click.echo(f"Attaching to: {location} {network}")
+            else:
+                # Multiple sessions, show list
+                click.echo("Active VPN sessions:")
+                for i, (location, network, session_name) in enumerate(active_sessions, 1):
+                    click.echo(f"  {i}. {location} {network}")
+                click.echo("Please specify which profile to attach to")
+                return False
+        else:
+            # Resolve the specified profile
+            resolved = self._resolve_profile(profile_input)
+            if not resolved:
+                click.echo(f"Profile '{profile_input}' not found.", err=True)
+                return False
+            
+            location, network, _ = resolved
+            session_name = self._get_session_name(location, network)
+            
+            if not self._check_session_exists(session_name):
+                click.echo(f"No active session found for: {location} {network}")
+                return False
+        
+        # Execute screen -rd to attach to the session
+        try:
+            os.execvp('screen', ['screen', '-rd', session_name])
+        except Exception as e:
+            click.echo(f"Failed to attach to session: {e}", err=True)
+            return False
 
 
 @click.group()
@@ -491,6 +544,16 @@ def list(ctx):
     """List all available VPN profiles"""
     manager = ctx.obj['manager']
     success = manager.list_profiles()
+    sys.exit(0 if success else 1)
+
+
+@cli.command()
+@click.argument('profile', required=False)
+@click.pass_context
+def attach(ctx, profile):
+    """Attach to VPN session with screen -rd"""
+    manager = ctx.obj['manager']
+    success = manager.attach(profile)
     sys.exit(0 if success else 1)
 
 
