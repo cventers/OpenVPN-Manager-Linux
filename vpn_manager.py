@@ -83,66 +83,19 @@ class VPNManager:
             location_part = parts[0]
             network_part = ' '.join(parts[1:])
             
-            # Fuzzy match location
-            location_choices = list(self.config['profiles'].keys())
-            location_match = process.extractOne(
-                location_part, 
-                location_choices,
-                scorer=fuzz.ratio
-            )
-            
-            if location_match and location_match[1] >= self.config['fuzzy_matching']['threshold']:
-                location = location_match[0]
+            # Simple exact match instead of fuzzy match to avoid Click issues
+            if location_part in self.config['profiles']:
+                location = location_part
                 loc_config = self.config['profiles'][location]
                 
-                # Fuzzy match network within location
-                network_choices = []
+                # Check for exact network match or alias match
                 for network, net_config in loc_config['networks'].items():
-                    network_choices.append(network)
-                    network_choices.extend(net_config.get('aliases', []))
-                
-                network_match = process.extractOne(
-                    network_part,
-                    network_choices,
-                    scorer=fuzz.ratio
-                )
-                
-                if network_match and network_match[1] >= self.config['fuzzy_matching']['threshold']:
-                    # Find the actual network name (not alias)
-                    matched_name = network_match[0]
-                    for network, net_config in loc_config['networks'].items():
-                        if network == matched_name or matched_name in net_config.get('aliases', []):
-                            file_path = self.base_dir / loc_config['directory'] / net_config['file']
-                            return location, network, str(file_path)
+                    if network == network_part or network_part in net_config.get('aliases', []):
+                        file_path = self.base_dir / loc_config['directory'] / net_config['file']
+                        return location, network, str(file_path)
         
-        # Try single fuzzy match across all networks
-        all_choices = []
-        choice_map = {}
-        
-        for location, loc_config in self.config['profiles'].items():
-            for network, net_config in loc_config['networks'].items():
-                full_name = f"{location} {network}"
-                all_choices.append(full_name)
-                choice_map[full_name] = (location, network, net_config)
-                
-                # Add aliases
-                for alias in net_config.get('aliases', []):
-                    alias_name = f"{location} {alias}"
-                    all_choices.append(alias_name)
-                    choice_map[alias_name] = (location, network, net_config)
-        
-        match = process.extractOne(
-            input_str,
-            all_choices,
-            scorer=fuzz.ratio
-        )
-        
-        if match and match[1] >= self.config['fuzzy_matching']['threshold']:
-            location, network, net_config = choice_map[match[0]]
-            loc_config = self.config['profiles'][location]
-            file_path = self.base_dir / loc_config['directory'] / net_config['file']
-            return location, network, str(file_path)
-        
+        # Fuzzy matching disabled due to Click interaction issues
+        # TODO: Implement safer fuzzy matching that doesn't interfere with Click
         return None
     
     def _get_session_name(self, location: str, network: str) -> str:
