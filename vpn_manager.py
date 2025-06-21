@@ -340,8 +340,10 @@ class VPNManager:
         """Disconnect VPN profile(s)"""
         if profile_input:
             # Disconnect specific profile
+            self.logger.info(f"Attempting to disconnect profile: '{profile_input}'")
             resolved = self._resolve_profile(profile_input)
             if not resolved:
+                self.logger.error(f"Profile resolution failed for: '{profile_input}'")
                 click.echo(f"Profile '{profile_input}' not found.", err=True)
                 return False
             
